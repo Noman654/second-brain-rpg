@@ -181,6 +181,8 @@ export interface Database {
                     user_id: string
                     title: string
                     content: string | null
+                    link: string | null
+                    linked_area_id: string | null
                     tags: string[] | null
                     created_at: string
                 }
@@ -189,6 +191,8 @@ export interface Database {
                     user_id: string
                     title: string
                     content?: string | null
+                    link?: string | null
+                    linked_area_id?: string | null
                     tags?: string[] | null
                     created_at?: string
                 }
@@ -197,6 +201,8 @@ export interface Database {
                     user_id?: string
                     title?: string
                     content?: string | null
+                    link?: string | null
+                    linked_area_id?: string | null
                     tags?: string[] | null
                     created_at?: string
                 }

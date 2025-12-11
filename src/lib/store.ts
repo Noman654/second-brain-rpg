@@ -10,7 +10,9 @@ type Area = Database['public']['Tables']['areas']['Row'];
 type Habit = Database['public']['Tables']['habits']['Row'];
 type Archive = Database['public']['Tables']['archives']['Row'];
 type Project = Database['public']['Tables']['projects']['Row'];
+
 type Milestone = Database['public']['Tables']['milestones']['Row'];
+type Resource = Database['public']['Tables']['resources']['Row'];
 
 interface ProjectWithMilestones extends Project {
     milestones: Milestone[];
@@ -27,7 +29,9 @@ interface GameState {
     projects: ProjectWithMilestones[];
     areas: Area[];
     habits: Habit[];
+
     archives: Archive[];
+    resources: Resource[];
 
     // Actions
     initialize: (userId: string) => Promise<void>;
@@ -38,6 +42,7 @@ interface GameState {
 
     // Projects
     createProject: (project: Omit<api.ProjectWithMilestones, 'id' | 'user_id' | 'created_at' | 'is_completed' | 'milestones'>, milestones: { text: string }[]) => Promise<void>;
+    updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>;
     toggleMilestone: (milestoneId: string, projectId: string) => Promise<void>;
     completeProject: (projectId: string) => Promise<void>;
     deleteProject: (projectId: string) => Promise<void>;
@@ -51,6 +56,10 @@ interface GameState {
     createHabit: (title: string, linkedAreaId: string, xpReward?: number) => Promise<void>;
     completeHabit: (habitId: string) => Promise<void>;
     deleteHabit: (habitId: string) => Promise<void>;
+
+    // Resources
+    createResource: (title: string, content: string, tags: string[], link?: string, linkedAreaId?: string) => Promise<void>;
+    deleteResource: (id: string) => Promise<void>;
 }
 
 const initialState = {
@@ -61,7 +70,9 @@ const initialState = {
     projects: [],
     areas: [],
     habits: [],
+
     archives: [],
+    resources: [],
 };
 
 export const useGameStore = create<GameState>()((set, get) => ({
@@ -72,12 +83,13 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
         try {
             // Fetch all data in parallel
-            const [profile, areas, projects, habits, archives] = await Promise.all([
+            const [profile, areas, projects, habits, archives, resources] = await Promise.all([
                 api.getProfile(userId),
                 api.getAreas(userId),
                 api.getProjects(userId),
                 api.getHabits(userId),
                 api.getArchives(userId),
+                api.fetchResources(userId),
             ]);
 
             // Check habit streaks
@@ -89,6 +101,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
                 projects,
                 habits,
                 archives,
+                resources,
                 loading: false,
                 initialized: true,
             });
@@ -126,6 +139,15 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
         if (project) {
             set((state) => ({ projects: [project, ...state.projects] }));
+        }
+    },
+
+    updateProject: async (projectId, updates) => {
+        const updated = await api.updateProject(projectId, updates);
+        if (updated) {
+            set((state) => ({
+                projects: state.projects.map((p) => (p.id === projectId ? { ...p, ...updated } : p)),
+            }));
         }
     },
 
@@ -287,6 +309,34 @@ export const useGameStore = create<GameState>()((set, get) => ({
         if (success) {
             set((state) => ({
                 habits: state.habits.filter((h) => h.id !== habitId),
+            }));
+        }
+    },
+
+    // Resources
+    createResource: async (title, content, tags, link, linkedAreaId) => {
+        const { userId } = get();
+        if (!userId) return;
+
+        const resource = await api.createResource({
+            user_id: userId,
+            title,
+            content,
+            tags,
+            link: link || null,
+            linked_area_id: linkedAreaId || null,
+        });
+
+        if (resource) {
+            set((state) => ({ resources: [resource, ...state.resources] }));
+        }
+    },
+
+    deleteResource: async (id) => {
+        const success = await api.deleteResource(id);
+        if (success) {
+            set((state) => ({
+                resources: state.resources.filter((r) => r.id !== id),
             }));
         }
     },

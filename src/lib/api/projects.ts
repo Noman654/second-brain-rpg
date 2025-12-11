@@ -131,3 +131,19 @@ export async function deleteProject(projectId: string): Promise<boolean> {
     }
     return true;
 }
+
+export async function updateProject(projectId: string, updates: ProjectUpdate): Promise<Project | null> {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', projectId)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error updating project:', error);
+        return null;
+    }
+    return data;
+}
