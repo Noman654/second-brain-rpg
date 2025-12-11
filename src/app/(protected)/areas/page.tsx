@@ -9,17 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Target, Swords, Brain, Users, Coins, PlusCircle, Pencil, Trash2, AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Area } from "@/types";
+import { useState } from "react";
+import type { Database } from "@/lib/database.types";
 
-const ATTRIBUTE_ICONS = {
+type Area = Database['public']['Tables']['areas']['Row'];
+
+const ATTRIBUTE_ICONS: Record<string, typeof Swords> = {
     strength: Swords,
     intellect: Brain,
     charisma: Users,
     wealth: Coins,
 };
 
-const ATTRIBUTE_COLORS = {
+const ATTRIBUTE_COLORS: Record<string, string> = {
     strength: "text-red-500",
     intellect: "text-blue-500",
     charisma: "text-purple-500",
@@ -29,38 +31,28 @@ const ATTRIBUTE_COLORS = {
 type AttributeType = 'strength' | 'intellect' | 'charisma' | 'wealth';
 
 export default function AreasPage() {
-    const [mounted, setMounted] = useState(false);
     const { areas, projects, createArea, updateArea, deleteArea } = useGameStore();
 
     // Create modal state
     const [createOpen, setCreateOpen] = useState(false);
     const [newTitle, setNewTitle] = useState("");
     const [newAttribute, setNewAttribute] = useState<AttributeType>("intellect");
+    const [loading, setLoading] = useState(false);
 
     // Edit modal state  
     const [editOpen, setEditOpen] = useState(false);
     const [editingArea, setEditingArea] = useState<Area | null>(null);
     const [editTitle, setEditTitle] = useState("");
-    const [editAttribute, setEditAttribute] = useState<AttributeType>("intellect");
 
     // Delete confirmation state
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deletingArea, setDeletingArea] = useState<Area | null>(null);
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    const handleCreate = (e: React.FormEvent) => {
+    const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        const newArea: Area = {
-            id: crypto.randomUUID(),
-            title: newTitle,
-            category: 'AREA',
-            associatedAttribute: newAttribute,
-            currentLevel: 1,
-        };
-        createArea(newArea);
+        setLoading(true);
+        await createArea(newTitle, newAttribute);
+        setLoading(false);
         setCreateOpen(false);
         setNewTitle("");
         setNewAttribute("intellect");
@@ -69,17 +61,15 @@ export default function AreasPage() {
     const handleEdit = (area: Area) => {
         setEditingArea(area);
         setEditTitle(area.title);
-        setEditAttribute(area.associatedAttribute);
         setEditOpen(true);
     };
 
-    const handleUpdate = (e: React.FormEvent) => {
+    const handleUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingArea) {
-            updateArea(editingArea.id, {
-                title: editTitle,
-                associatedAttribute: editAttribute,
-            });
+            setLoading(true);
+            await updateArea(editingArea.id, editTitle);
+            setLoading(false);
             setEditOpen(false);
             setEditingArea(null);
         }
@@ -90,21 +80,19 @@ export default function AreasPage() {
         setDeleteOpen(true);
     };
 
-    const handleDeleteConfirm = () => {
+    const handleDeleteConfirm = async () => {
         if (deletingArea) {
-            deleteArea(deletingArea.id);
+            setLoading(true);
+            await deleteArea(deletingArea.id);
+            setLoading(false);
             setDeleteOpen(false);
             setDeletingArea(null);
         }
     };
 
     const getLinkedProjectsCount = (areaId: string) => {
-        return projects.filter(p => p.linkedAreaId === areaId).length;
+        return projects.filter(p => p.linked_area_id === areaId).length;
     };
-
-    if (!mounted) {
-        return <div className="p-8">Loading Realms...</div>;
-    }
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -158,7 +146,9 @@ export default function AreasPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <Button type="submit" className="w-full">Create Realm</Button>
+                            <Button type="submit" className="w-full" disabled={loading}>
+                                {loading ? "Creating..." : "Create Realm"}
+                            </Button>
                         </form>
                     </DialogContent>
                 </Dialog>
@@ -182,21 +172,9 @@ export default function AreasPage() {
                                 required
                             />
                         </div>
-                        <div className="grid gap-2">
-                            <Label>Linked Attribute</Label>
-                            <Select value={editAttribute} onValueChange={(v) => setEditAttribute(v as AttributeType)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="strength">💪 Strength (Health/Fitness)</SelectItem>
-                                    <SelectItem value="intellect">🧠 Intellect (Learning/Study)</SelectItem>
-                                    <SelectItem value="charisma">👥 Charisma (Social/Network)</SelectItem>
-                                    <SelectItem value="wealth">💰 Wealth (Finance/Career)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button type="submit" className="w-full">Save Changes</Button>
+                        <Button type="submit" className="w-full" disabled={loading}>
+                            {loading ? "Saving..." : "Save Changes"}
+                        </Button>
                     </form>
                 </DialogContent>
             </Dialog>
@@ -220,7 +198,9 @@ export default function AreasPage() {
                     </DialogHeader>
                     <div className="flex gap-2 justify-end pt-4">
                         <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-                        <Button variant="destructive" onClick={handleDeleteConfirm}>Delete</Button>
+                        <Button variant="destructive" onClick={handleDeleteConfirm} disabled={loading}>
+                            {loading ? "Deleting..." : "Delete"}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -236,9 +216,9 @@ export default function AreasPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2">
                     {areas.map((area) => {
-                        const Icon = ATTRIBUTE_ICONS[area.associatedAttribute];
-                        const colorClass = ATTRIBUTE_COLORS[area.associatedAttribute];
-                        const activeProjects = projects.filter(p => p.linkedAreaId === area.id && !p.isCompleted);
+                        const Icon = ATTRIBUTE_ICONS[area.associated_attribute] || Target;
+                        const colorClass = ATTRIBUTE_COLORS[area.associated_attribute] || "text-primary";
+                        const activeProjects = projects.filter(p => p.linked_area_id === area.id && !p.is_completed);
 
                         return (
                             <Card key={area.id} className="hover:shadow-md transition-all group">
@@ -250,7 +230,7 @@ export default function AreasPage() {
                                         </CardTitle>
                                         <div className="flex items-center gap-1">
                                             <Badge variant="outline" className="uppercase text-[10px]">
-                                                Level {area.currentLevel}
+                                                Level {area.current_level}
                                             </Badge>
                                             <Button
                                                 variant="ghost"
@@ -276,7 +256,7 @@ export default function AreasPage() {
                                         <span className="font-medium text-foreground">{activeProjects.length}</span> active quest{activeProjects.length !== 1 ? 's' : ''} linked
                                     </div>
                                     <div className="mt-2 text-xs text-muted-foreground capitalize">
-                                        Attribute: <span className={`font-bold ${colorClass}`}>{area.associatedAttribute}</span>
+                                        Attribute: <span className={`font-bold ${colorClass}`}>{area.associated_attribute}</span>
                                     </div>
                                 </CardContent>
                             </Card>

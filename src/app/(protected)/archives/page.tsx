@@ -4,20 +4,10 @@ import { useGameStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Archive, Trophy, Calendar } from "lucide-react";
-import { useEffect, useState } from "react";
 import { format } from "date-fns";
 
 export default function ArchivesPage() {
-    const [mounted, setMounted] = useState(false);
     const { archives } = useGameStore();
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    if (!mounted) {
-        return <div className="p-8">Loading Graveyard...</div>;
-    }
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -42,7 +32,7 @@ export default function ArchivesPage() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {archives.map((item) => (
-                        <Card key={item.originalId} className="hover:shadow-md transition-all bg-gradient-to-br from-amber-500/5 to-yellow-500/5 border-amber-500/20">
+                        <Card key={item.id} className="hover:shadow-md transition-all bg-gradient-to-br from-amber-500/5 to-yellow-500/5 border-amber-500/20">
                             <CardHeader className="pb-2">
                                 <div className="flex items-center gap-2">
                                     <Trophy className="w-4 h-4 text-amber-500" />
@@ -56,7 +46,7 @@ export default function ArchivesPage() {
                                     </Badge>
                                     <div className="flex items-center gap-1">
                                         <Calendar className="w-3 h-3" />
-                                        {format(new Date(item.completedDate), 'MMM d, yyyy')}
+                                        {format(new Date(item.completed_date), 'MMM d, yyyy')}
                                     </div>
                                 </div>
                             </CardContent>

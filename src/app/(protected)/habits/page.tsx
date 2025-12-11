@@ -10,57 +10,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Flame, PlusCircle, Trash2, Trophy, Clock, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Habit } from "@/types";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import type { Database } from "@/lib/database.types";
+
+type Habit = Database['public']['Tables']['habits']['Row'];
 
 export default function HabitsPage() {
-    const [mounted, setMounted] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
-    const { habits, areas, createHabit, completeHabit, deleteHabit, resetDailyHabits } = useGameStore();
+    const [loading, setLoading] = useState(false);
+    const { habits, areas, createHabit, completeHabit, deleteHabit } = useGameStore();
 
     // Form state
     const [title, setTitle] = useState("");
     const [areaId, setAreaId] = useState("");
-    const [targetMinutes, setTargetMinutes] = useState("");
     const [xpReward, setXpReward] = useState("25");
 
-    useEffect(() => {
-        setMounted(true);
-        // Reset daily habits on page load
-        resetDailyHabits();
-    }, [resetDailyHabits]);
-
-    const handleCreate = (e: React.FormEvent) => {
+    const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        setLoading(true);
 
-        const newHabit: Habit = {
-            id: crypto.randomUUID(),
-            title,
-            linkedAreaId: areaId,
-            targetMinutes: targetMinutes ? parseInt(targetMinutes) : undefined,
-            xpReward: parseInt(xpReward) || 25,
-            streak: 0,
-            bestStreak: 0,
-            lastCompletedDate: null,
-            completedToday: false,
-        };
+        await createHabit(title, areaId, parseInt(xpReward) || 25);
 
-        createHabit(newHabit);
+        setLoading(false);
         setCreateOpen(false);
         setTitle("");
         setAreaId("");
-        setTargetMinutes("");
         setXpReward("25");
     };
 
     const getAreaForHabit = (habit: Habit) => {
-        return areas.find(a => a.id === habit.linkedAreaId);
+        return areas.find(a => a.id === habit.linked_area_id);
     };
 
-    if (!mounted) {
-        return <div className="p-8">Loading Habits...</div>;
-    }
+    const isCompletedToday = (habit: Habit) => {
+        const today = new Date().toISOString().split('T')[0];
+        return habit.last_completed_date === today;
+    };
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -116,32 +102,23 @@ export default function HabitsPage() {
                                 </Select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>Daily Goal (minutes)</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="Optional, e.g. 60"
-                                        value={targetMinutes}
-                                        onChange={e => setTargetMinutes(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>XP Reward</Label>
-                                    <Select value={xpReward} onValueChange={setXpReward}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="10">10 XP (Easy)</SelectItem>
-                                            <SelectItem value="25">25 XP (Medium)</SelectItem>
-                                            <SelectItem value="50">50 XP (Hard)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                            <div className="grid gap-2">
+                                <Label>XP Reward</Label>
+                                <Select value={xpReward} onValueChange={setXpReward}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="10">10 XP (Easy)</SelectItem>
+                                        <SelectItem value="25">25 XP (Medium)</SelectItem>
+                                        <SelectItem value="50">50 XP (Hard)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
 
-                            <Button type="submit" className="w-full">Create Habit</Button>
+                            <Button type="submit" className="w-full" disabled={loading}>
+                                {loading ? "Creating..." : "Create Habit"}
+                            </Button>
                         </form>
                     </DialogContent>
                 </Dialog>
@@ -159,27 +136,28 @@ export default function HabitsPage() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {habits.map((habit) => {
                         const area = getAreaForHabit(habit);
+                        const completedToday = isCompletedToday(habit);
 
                         return (
                             <Card
                                 key={habit.id}
                                 className={cn(
                                     "transition-all hover:shadow-md group",
-                                    habit.completedToday && "bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30"
+                                    completedToday && "bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30"
                                 )}
                             >
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <Checkbox
-                                                checked={habit.completedToday}
-                                                onCheckedChange={() => !habit.completedToday && completeHabit(habit.id)}
+                                                checked={completedToday}
+                                                onCheckedChange={() => !completedToday && completeHabit(habit.id)}
                                                 className="h-6 w-6"
-                                                disabled={habit.completedToday}
+                                                disabled={completedToday}
                                             />
                                             <CardTitle className={cn(
                                                 "text-base font-bold",
-                                                habit.completedToday && "line-through text-muted-foreground"
+                                                completedToday && "line-through text-muted-foreground"
                                             )}>
                                                 {habit.title}
                                             </CardTitle>
@@ -201,15 +179,15 @@ export default function HabitsPage() {
                                                 {area.title}
                                             </Badge>
                                         )}
-                                        {habit.targetMinutes && (
+                                        {habit.target_minutes && (
                                             <Badge variant="secondary" className="text-[10px]">
                                                 <Clock className="w-2.5 h-2.5 mr-1" />
-                                                {habit.targetMinutes} min
+                                                {habit.target_minutes} min
                                             </Badge>
                                         )}
                                         <Badge className="text-[10px] bg-primary/10 text-primary">
                                             <Zap className="w-2.5 h-2.5 mr-1" />
-                                            +{habit.xpReward} XP
+                                            +{habit.xp_reward} XP
                                         </Badge>
                                     </div>
 
@@ -226,10 +204,10 @@ export default function HabitsPage() {
                                                 {habit.streak} day streak
                                             </span>
                                         </div>
-                                        {habit.bestStreak > 0 && (
+                                        {habit.best_streak > 0 && (
                                             <div className="flex items-center gap-1 text-muted-foreground text-xs">
                                                 <Trophy className="w-3 h-3" />
-                                                Best: {habit.bestStreak}
+                                                Best: {habit.best_streak}
                                             </div>
                                         )}
                                     </div>

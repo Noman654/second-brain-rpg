@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PlusCircle } from "lucide-react";
-import { Difficulty, Project } from "@/types";
 
+type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EPIC';
 
 export function CreateQuestModal() {
     const [open, setOpen] = useState(false);
@@ -21,19 +21,17 @@ export function CreateQuestModal() {
     const [difficulty, setDifficulty] = useState<Difficulty>("EASY");
     const [milestonesText, setMilestonesText] = useState("");
     const [deadline, setDeadline] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setLoading(true);
 
         // Parse milestones (one per line)
         const milestones = milestonesText
             .split('\n')
             .filter(line => line.trim().length > 0)
-            .map(text => ({
-                id: crypto.randomUUID(),
-                text: text.trim(),
-                isDone: false
-            }));
+            .map(text => ({ text: text.trim() }));
 
         const xpMap: Record<Difficulty, number> = {
             'EASY': 50,
@@ -42,19 +40,18 @@ export function CreateQuestModal() {
             'EPIC': 500
         };
 
-        const newProject: Project = {
-            id: crypto.randomUUID(),
-            title,
-            category: 'PROJECT',
-            linkedAreaId: areaId,
-            difficulty,
-            milestones,
-            isCompleted: false,
-            deadline: deadline ? new Date(deadline) : new Date(Date.now() + 86400000 * 7), // Default 7 days
-            xpReward: xpMap[difficulty]
-        };
+        await createProject(
+            {
+                title,
+                linked_area_id: areaId || null,
+                difficulty,
+                deadline: deadline ? new Date(deadline).toISOString() : new Date(Date.now() + 86400000 * 7).toISOString(),
+                xp_reward: xpMap[difficulty]
+            },
+            milestones
+        );
 
-        createProject(newProject);
+        setLoading(false);
         setOpen(false);
         resetForm();
     };
@@ -105,7 +102,7 @@ export function CreateQuestModal() {
                                 <SelectContent>
                                     {areas.map(area => (
                                         <SelectItem key={area.id} value={area.id}>
-                                            {area.title} ({area.associatedAttribute})
+                                            {area.title} ({area.associated_attribute})
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -149,7 +146,9 @@ export function CreateQuestModal() {
                         />
                     </div>
 
-                    <Button type="submit" className="w-full">Accept Quest</Button>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? "Creating..." : "Accept Quest"}
+                    </Button>
                 </form>
             </DialogContent>
         </Dialog>

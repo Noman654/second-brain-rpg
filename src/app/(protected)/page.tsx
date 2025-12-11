@@ -3,23 +3,13 @@
 import { useGameStore } from "@/lib/store";
 import { QuestCard } from "@/components/QuestCard";
 import { CreateQuestModal } from "@/components/CreateQuestModal";
-import { useEffect, useState } from "react";
 import { Sword } from "lucide-react";
 
 export default function Dashboard() {
-  // Use client-side only rendering to avoid hydration mismatch with persist middleware
-  const [mounted, setMounted] = useState(false);
   const { projects } = useGameStore();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return <div className="p-8">Loading Quests...</div>;
-  }
-
-  const activeProjects = projects.filter(p => !p.isCompleted);
+  // Projects are now filtered on the server side (is_completed = false)
+  const activeProjects = projects;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
