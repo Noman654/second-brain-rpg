@@ -10,9 +10,11 @@ type Area = Database['public']['Tables']['areas']['Row'];
 type Habit = Database['public']['Tables']['habits']['Row'];
 type Archive = Database['public']['Tables']['archives']['Row'];
 type Project = Database['public']['Tables']['projects']['Row'];
-
 type Milestone = Database['public']['Tables']['milestones']['Row'];
 type Resource = Database['public']['Tables']['resources']['Row'];
+
+type FriendProfile = api.FriendProfile;
+type Notification = api.Notification;
 
 interface ProjectWithMilestones extends Project {
     milestones: Milestone[];
@@ -29,9 +31,20 @@ interface GameState {
     projects: ProjectWithMilestones[];
     areas: Area[];
     habits: Habit[];
-
     archives: Archive[];
     resources: Resource[];
+
+    // Social Data
+    friends: FriendProfile[];
+    pendingRequests: FriendProfile[];
+    leaderboard: Profile[];
+    notifications: Notification[];
+
+    // Actions
+    fetchNotifications: () => Promise<void>;
+    sendChallenge: (friendId: string, type: 'habit_challenge', title: string, data: any) => Promise<boolean>;
+    acceptChallenge: (notification: Notification) => Promise<void>;
+    dismissNotification: (id: string) => Promise<void>;
 
     // Actions
     initialize: (userId: string) => Promise<void>;
@@ -60,6 +73,12 @@ interface GameState {
     // Resources
     createResource: (title: string, content: string, tags: string[], link?: string, linkedAreaId?: string) => Promise<void>;
     deleteResource: (id: string) => Promise<void>;
+
+    // Social Actions
+    fetchSocials: () => Promise<void>;
+    sendFriendRequest: (userId: string) => Promise<boolean>;
+    acceptFriendRequest: (friendshipId: string) => Promise<void>;
+    declineFriendRequest: (friendshipId: string) => Promise<void>;
 }
 
 const initialState = {
@@ -70,9 +89,12 @@ const initialState = {
     projects: [],
     areas: [],
     habits: [],
-
     archives: [],
     resources: [],
+    friends: [],
+    pendingRequests: [],
+    notifications: [],
+    leaderboard: [],
 };
 
 export const useGameStore = create<GameState>()((set, get) => ({
@@ -83,13 +105,15 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
         try {
             // Fetch all data in parallel
-            const [profile, areas, projects, habits, archives, resources] = await Promise.all([
+            const [profile, areas, projects, habits, archives, resources, friendsData, leaderboard] = await Promise.all([
                 api.getProfile(userId),
                 api.getAreas(userId),
                 api.getProjects(userId),
                 api.getHabits(userId),
                 api.getArchives(userId),
                 api.fetchResources(userId),
+                api.getFriends(userId),
+                api.getLeaderboard(),
             ]);
 
             // Check habit streaks
@@ -102,6 +126,9 @@ export const useGameStore = create<GameState>()((set, get) => ({
                 habits,
                 archives,
                 resources,
+                friends: friendsData?.confirmed || [],
+                pendingRequests: friendsData?.pending || [],
+                leaderboard: leaderboard || [],
                 loading: false,
                 initialized: true,
             });
@@ -122,7 +149,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
     // Projects
     createProject: async (projectData, milestones) => {
-        const { userId, areas, profile } = get();
+        const { userId } = get();
         if (!userId) return;
 
         const project = await api.createProject(
@@ -338,6 +365,77 @@ export const useGameStore = create<GameState>()((set, get) => ({
             set((state) => ({
                 resources: state.resources.filter((r) => r.id !== id),
             }));
+        }
+    },
+
+    // Social
+    fetchSocials: async () => {
+        const { userId } = get();
+        if (!userId) return;
+
+        const [friendsData, leaderboard, notifications] = await Promise.all([
+            api.getFriends(userId),
+            api.getLeaderboard(),
+            api.getNotifications(userId),
+        ]);
+
+        set({
+            friends: friendsData.confirmed,
+            pendingRequests: friendsData.pending,
+            leaderboard,
+            notifications,
+        });
+    },
+
+    fetchNotifications: async () => {
+        const { userId } = get();
+        if (!userId) return;
+        const notifications = await api.getNotifications(userId);
+        set({ notifications });
+    },
+
+    sendChallenge: async (friendId, type, title, data) => {
+        const { userId } = get();
+        if (!userId) return false;
+        return await api.sendChallenge(userId, friendId, type, title, data);
+    },
+
+    acceptChallenge: async (notification) => {
+        const { userId } = get();
+        if (!userId) return;
+
+        // Create the habit based on challenge data
+        if (notification.type === 'habit_challenge') {
+            await get().createHabit(notification.title, notification.data.linkedAreaId, notification.data.xpReward);
+        }
+
+        // Delete notification after accepting
+        await api.deleteNotification(notification.id);
+        await get().fetchNotifications();
+    },
+
+    dismissNotification: async (id) => {
+        await api.deleteNotification(id);
+        await get().fetchNotifications();
+    },
+
+    sendFriendRequest: async (friendId) => {
+        const { userId } = get();
+        if (!userId) return false;
+        return await api.sendFriendRequest(userId, friendId);
+    },
+
+    acceptFriendRequest: async (friendshipId) => {
+        const success = await api.acceptFriendRequest(friendshipId);
+        if (success) {
+            await get().fetchSocials(); // Refresh lists
+        }
+    },
+
+    declineFriendRequest: async (friendshipId) => {
+        const success = await api.declineFriendRequest(friendshipId);
+        if (success) {
+            await get().fetchSocials(); // Refresh lists
         }
     },
 }));

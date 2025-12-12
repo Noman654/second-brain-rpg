@@ -233,6 +233,29 @@ export interface Database {
                     completed_date?: string
                 }
             }
+            friendships: {
+                Row: {
+                    id: string
+                    user_id: string
+                    friend_id: string
+                    status: 'pending' | 'accepted'
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    friend_id: string
+                    status: 'pending' | 'accepted'
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    friend_id?: string
+                    status?: 'pending' | 'accepted'
+                    created_at?: string
+                }
+            }
         }
         Views: {
             [_ in never]: never

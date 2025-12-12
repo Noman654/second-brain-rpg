@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Flame, PlusCircle, Trash2, Trophy, Clock, Zap } from "lucide-react";
+import { Flame, PlusCircle, Trash2, Trophy, Clock, Zap, Send } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
+import { ChallengeModal } from "@/components/ChallengeModal";
 
 type Habit = Database['public']['Tables']['habits']['Row'];
 
@@ -25,6 +26,13 @@ export default function HabitsPage() {
     const [title, setTitle] = useState("");
     const [areaId, setAreaId] = useState("");
     const [xpReward, setXpReward] = useState("25");
+
+    const [challengeData, setChallengeData] = useState({
+        open: false,
+        title: "",
+        xpReward: 25,
+        linkedAreaId: ""
+    });
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -162,14 +170,30 @@ export default function HabitsPage() {
                                                 {habit.title}
                                             </CardTitle>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                                            onClick={() => deleteHabit(habit.id)}
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                onClick={() => setChallengeData({
+                                                    open: true,
+                                                    title: habit.title,
+                                                    xpReward: habit.xp_reward || 25,
+                                                    linkedAreaId: habit.linked_area_id || ""
+                                                })}
+                                                title="Challenge Friend"
+                                            >
+                                                <Send className="w-3.5 h-3.5" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                onClick={() => deleteHabit(habit.id)}
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
@@ -217,6 +241,14 @@ export default function HabitsPage() {
                     })}
                 </div>
             )}
+
+            <ChallengeModal
+                open={challengeData.open}
+                onOpenChange={(open) => setChallengeData(prev => ({ ...prev, open }))}
+                title={challengeData.title}
+                xpReward={challengeData.xpReward}
+                linkedAreaId={challengeData.linkedAreaId}
+            />
         </div>
     );
 }

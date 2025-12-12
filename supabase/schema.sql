@@ -179,6 +179,43 @@ CREATE POLICY "Users can update own resources" ON resources
 CREATE POLICY "Users can delete own resources" ON resources
   FOR DELETE USING (auth.uid() = user_id);
 
+-- Social Features: Friendships table
+CREATE TABLE friendships (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  friend_id UUID REFERENCES auth.users NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'accepted')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, friend_id)
+);
+
+-- RLS for Friendships
+ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
+
+-- Users can view their own friendships (either as requester or recipient)
+CREATE POLICY "Users can view own friendships" ON friendships
+  FOR SELECT USING (auth.uid() = user_id OR auth.uid() = friend_id);
+
+-- Users can insert friend requests (user_id must be themselves)
+CREATE POLICY "Users can send friend requests" ON friendships
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can update status (accept requests)
+-- Only the recipient (friend_id) can accept (update status)
+-- Or the sender can cancel? (Usually delete). Let's keep it simple: Recipient updates.
+CREATE POLICY "Recipient can accept friend requests" ON friendships
+  FOR UPDATE USING (auth.uid() = friend_id);
+
+-- Users can delete friendships (unfriend or cancel request)
+CREATE POLICY "Users can delete own friendships" ON friendships
+  FOR DELETE USING (auth.uid() = user_id OR auth.uid() = friend_id);
+
+-- Update Profiles RLS to be Publicly Readable (for Leaderboards)
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+CREATE POLICY "Profiles are viewable by everyone" ON profiles
+  FOR SELECT USING (true);
+
+
 -- Archives: Users can only access their own archives
 CREATE POLICY "Users can view own archives" ON archives
   FOR SELECT USING (auth.uid() = user_id);

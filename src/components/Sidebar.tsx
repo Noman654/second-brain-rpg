@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Target, Archive, BookOpen, Sword, Flame, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Target, Archive, BookOpen, Sword, Flame, LogOut, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     { label: "Quests", icon: Sword, href: "/", description: "Active Projects" },
     { label: "Daily Habits", icon: Flame, href: "/habits", description: "Recurring Tasks" },
     { label: "Realms", icon: Target, href: "/areas", description: "Areas of Responsibility" },
+    { label: "Social Hub", icon: Users, href: "/social", description: "Friends & Leaderboard" },
     { label: "Library", icon: BookOpen, href: "/resources", description: "Resources & Notes" },
     { label: "Graveyard", icon: Archive, href: "/archives", description: "Completed Achievements" },
 ];
